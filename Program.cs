@@ -21,7 +21,7 @@ class TokenMessage
 class Program
 {
     // Formata a placa antiga no padrão Mercosul
-    public static string FormatarPlaca(string placa)
+    public static string FormatPlaca(string placa)
     {
         int quartoNum = (int)char.GetNumericValue(placa[4]);
         char quartoNumFormatado = (char)(quartoNum + 'A');
@@ -29,6 +29,14 @@ class Program
         quartoNumFormatado +
         placa.Substring(5, 2);
         return placaFormatada;
+    }
+
+    // Loga a placa e a placa Mercosul do primeiro veículo encontrado na consulta
+    public static async Task PlacaLog(IQueryable<Vehicle> query)
+    {
+        Vehicle first = await query.FirstAsync();
+
+        Console.WriteLine($"ID: {first.Id}, Placa: {first.Placa}, Placa Mercosul: {first.Placa_Mercosul}");
     }
 
     static async Task<int> Main(string[] args)
@@ -72,18 +80,22 @@ class Program
         if (column == "placa")
         {
             query = db.Vehicles.FromSqlInterpolated($"SELECT * FROM vehicles WHERE placa = {placa}");
-            Console.WriteLine("Placa já cadastrada no banco de dados:");
-            Vehicle first = await query.FirstAsync();
-            Console.WriteLine($"ID: {first.Id}, Placa: {first.Placa}, Placa Mercosul: {first.Placa_Mercosul}");
-            return 0;
+            if (await query.AnyAsync())
+            {
+                Console.WriteLine("Placa já cadastrada no banco de dados:");
+                await PlacaLog(query);
+                return 0;
+            }
         }
-        else if (column == "placa_mercosul")
+        else
         {
             query = db.Vehicles.FromSqlInterpolated($"SELECT * FROM vehicles WHERE placa_mercosul = {placa}");
-            Console.WriteLine("Placa já cadastrada no banco de dados:");
-            Vehicle first = await query.FirstAsync();
-            Console.WriteLine($"ID: {first.Id}, Placa: {first.Placa}, Placa Mercosul: {first.Placa_Mercosul}");
-            return 0;
+            if (await query.AnyAsync())
+            {
+                Console.WriteLine("Placa já cadastrada no banco de dados:");
+                await PlacaLog(query);
+                return 0;
+            }
         }
 
         Console.WriteLine("Prosseguindo com a consulta...");
@@ -195,7 +207,7 @@ class Program
             {
                 Console.WriteLine("Placa mercosul não encontrada. Formatando a antiga no padrão novo e salvando no banco de dados...");
 
-                string placaFormatada = FormatarPlaca(placaAntiga);
+                string placaFormatada = FormatPlaca(placaAntiga);
                 await db.AddAsync<Vehicle>(new Vehicle
                 {
                     Placa = placaAntiga,
@@ -214,7 +226,7 @@ class Program
                 if (Regex.IsMatch(placaMercosul, oldPattern))
                 {
                     Console.WriteLine("Placa Mercosul está no formato antigo. Formatando para o novo padrão...");
-                    placaMercosul = FormatarPlaca(placaMercosul);
+                    placaMercosul = FormatPlaca(placaMercosul);
                 }
                 await db.AddAsync<Vehicle>(new Vehicle
                 {
